@@ -102,6 +102,16 @@
       <artifactId>commons-text</artifactId>
       <version>1.8</version>
     </dependency>
+    <dependency>
+      <groupId>org.apache.nifi</groupId>
+      <artifactId>nifi-standard-processors</artifactId>
+      <version>1.11.4</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.nifi</groupId>
+      <artifactId>nifi-mock</artifactId>
+      <version>1.11.4</version>
+    </dependency>
   </dependencies>
 
   <build>

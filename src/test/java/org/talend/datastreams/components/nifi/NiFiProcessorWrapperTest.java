@@ -1,13 +1,4 @@
-package com.uppercase.talend.components.processor;
-
-import static java.util.Arrays.asList;
-import static java.util.stream.Collectors.toList;
-import static org.junit.Assert.assertEquals;
-
-import java.io.Serializable;
-import java.util.stream.StreamSupport;
-import java.util.List;
-import java.util.Map;
+package org.talend.datastreams.components.nifi;
 
 import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.testing.PAssert;
@@ -20,6 +11,7 @@ import org.hamcrest.core.Is;
 import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
+import org.talend.datastreams.components.Records;
 import org.talend.sdk.component.api.record.Record;
 import org.talend.sdk.component.api.service.Service;
 import org.talend.sdk.component.api.service.record.RecordBuilderFactory;
@@ -31,11 +23,21 @@ import org.talend.sdk.component.junit5.WithMavenServers;
 import org.talend.sdk.component.runtime.beam.TalendFn;
 import org.talend.sdk.component.runtime.output.Processor;
 
-@WithComponents("com.uppercase.talend.components.processor")
+import java.io.Serializable;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.StreamSupport;
+
+import static java.util.Arrays.asList;
+import static java.util.stream.Collectors.toList;
+import static org.junit.Assert.assertEquals;
+
+@WithComponents("org.talend.datastreams.components.nifi")
 @WithMavenServers
-public class UpperCaseProcessorBeamTest implements Serializable {
+public class NiFiProcessorWrapperTest implements Serializable {
     @ClassRule
-    public static final SimpleComponentRule COMPONENT_FACTORY = new SimpleComponentRule("com.uppercase.talend.components.processor");
+    public static final SimpleComponentRule COMPONENT_FACTORY = new SimpleComponentRule(
+            "com.uppercase.talend.components.processor");
     @Rule
     public transient final TestPipeline pipeline = TestPipeline.create();
     @Service
@@ -44,33 +46,28 @@ public class UpperCaseProcessorBeamTest implements Serializable {
     public void processor() {
         // Processor configuration
         // Setup your component configuration for the test here
-        final UpperCaseProcessorConfiguration configuration =  new UpperCaseProcessorConfiguration()
-                /*  .setActiveCamelCase() */;
-        configuration.setActiveCamelCase(true);
-        // We create the component processor instance using the configuration filled above
-        final Processor processor = COMPONENT_FACTORY.createProcessor(UpperCaseProcessor.class, configuration);
-        // The join input factory construct inputs test data for every input branch you have defined for this component
-        // Make sure to fil in some test data for the branches you want to test
-        // You can also remove the branches that you don't need from the factory below
+        final NiFiProcessorWrapperConfiguration configuration =  new NiFiProcessorWrapperConfiguration();
+        configuration.setGenerateNiFiOutputAttributes(true);
+
+        final Processor processor = COMPONENT_FACTORY.createProcessor(NiFiProcessorWrapper.class, configuration);
         final JoinInputFactory joinInputFactory =  new JoinInputFactory()
-                .withInput("__default__", asList(new Records("aaa", 22), new Records("camel case", 50)));
-        // Convert it to a beam "source"
+                .withInput("__default__", asList(new Records("some test data for the branches you want to test",
+                        22), new Records("camel case", 50)));
         final PCollection<Record> inputs =
                 pipeline.apply(Data.of(processor.plugin(), joinInputFactory.asInputRecords()));
-        // add our processor right after to see each data as configured previously
         final PCollection<Map<String, Record>> outputs = inputs.apply(TalendFn.asFn(processor))
                 .apply(Data.map(processor.plugin(), Record.class));
 
         PAssert.that(outputs).satisfies((SerializableFunction<Iterable<Map<String, Record>>, Void>) input -> {
-            final List<Map<String, Record>> result = StreamSupport.stream(input.spliterator(), false).collect(toList());
+            final List<Map<String, Record>> result = StreamSupport.stream(input.spliterator(), false)
+                    .collect(toList());
             result.forEach(r -> {
-                MatcherAssert.assertThat(r.get("__default__").getString("name"), AnyOf.anyOf(Is.is("Aaa"), Is.is("CamelCase")));
+                MatcherAssert.assertThat(r.get("__default__").getString("name"), AnyOf.anyOf(Is.is("Aaa"),
+                        Is.is("CamelCase")));
             });
             return null;
         });
 
-
-        // run the pipeline and ensure the execution was successful
         assertEquals(PipelineResult.State.DONE, pipeline.run().waitUntilFinish());
     }
 
